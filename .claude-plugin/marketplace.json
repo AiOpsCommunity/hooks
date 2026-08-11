@@ -1,5 +1,6 @@
 {
   "name": "aiops-hooks",
+  "description": "Claude Code hooks shared by the AiOps Community: guardrails, formatters and session helpers, each installable on its own.",
   "owner": {
     "name": "AiOps Community"
   },
