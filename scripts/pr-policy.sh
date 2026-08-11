@@ -31,7 +31,9 @@ if [[ -z "$changed" ]]; then
 fi
 
 echo "changed files vs $base:"
-echo "$changed" | sed 's/^/  /'
+while IFS= read -r line; do
+  printf '  %s\n' "$line"
+done <<< "$changed"
 echo
 
 CHANGED="$changed" BASE="$merge_base" python3 - <<'PY'

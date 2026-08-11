@@ -39,7 +39,10 @@ jobs:
           mapfile -t files < <(git ls-files '*.sh')
           if [ ${#files[@]} -eq 0 ]; then echo "no shell scripts"; exit 0; fi
           printf 'checking: %s\n' "${files[@]}"
-          shellcheck "${files[@]}"
+          # severity=warning: real problems fail the build, pure style
+          # suggestions do not. A contributor should not have a hook rejected
+          # over SC2001.
+          shellcheck --severity=warning "${files[@]}"
 
       - name: python syntax
         run: |
