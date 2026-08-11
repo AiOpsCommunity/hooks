@@ -41,8 +41,13 @@ real path.
 ├── CONTRIBUTING.md
 ├── .claude-plugin/
 │   └── marketplace.json          # plugin catalog for /plugin install
+├── .github/
+│   └── workflows/
+│       └── pr-checks.yml         # runs the scripts below on every PR
 ├── scripts/
-│   └── validate.sh               # JSON + event name + permission checks
+│   ├── validate.sh               # structure: JSON, events, paths, permissions
+│   ├── pr-policy.sh              # one hook per PR, registered properly
+│   └── review-flags.sh           # advisory: lines a reviewer should read
 └── hooks/
     ├── _template/                # copy this to start a new hook
     └── <hook-name>/

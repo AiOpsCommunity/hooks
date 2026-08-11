@@ -38,7 +38,15 @@ event. Review PRs here with that in mind, and expect the same of your own.
 
 ```bash
 ./scripts/validate.sh            # marketplace.json, plugin.json, hooks.json, events, permissions
+./scripts/pr-policy.sh           # one hook per PR, and the hook is registered
+./scripts/review-flags.sh        # lines a reviewer should read closely (never fails)
 ```
+
+CI runs the same three scripts on every pull request, so a green run here is a green run there.
+`structure`, `lint` and `pr-policy` must pass before a PR can merge. `review-flags` is advisory: it
+prints a table of lines worth a second look and always passes, because every pattern it knows has
+legitimate uses. If it flags your hook, explain why in the PR rather than leaving the reviewer to
+work it out.
 
 Then test for real:
 

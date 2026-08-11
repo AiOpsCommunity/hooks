@@ -1,44 +1,49 @@
 #!/usr/bin/env bash
 #
 # validate.sh - structural checks for this repo. Run before opening a PR.
+# CI runs the same script, so a green run here means a green run there.
 #
-# Checks:
-#   - marketplace.json is valid JSON and every plugin source resolves
-#   - every hook has plugin.json and hooks/hooks.json, both valid JSON
-#   - plugin.json name matches the folder name
-#   - hook event names are recognised
-#   - referenced scripts exist and are executable
-#   - commands use "${CLAUDE_PLUGIN_ROOT}" instead of a relative or personal path
-#   - every hook has a README.md
+# Fails on (these break installation or violate the rules):
+#   - marketplace.json invalid, or a plugin source that does not exist
+#   - a hook missing plugin.json, hooks/hooks.json or README.md
+#   - plugin.json name not matching the folder, or missing required fields
+#   - unknown hook event names
+#   - commands not using "${CLAUDE_PLUGIN_ROOT}", or containing a personal path
+#   - script paths escaping the plugin directory
+#   - referenced scripts missing, not executable, or without a shebang
+#   - a hook on disk that is not listed in marketplace.json
+#   - _template being structurally broken
 #
-# It cannot tell you whether a hook is a good idea or safe. Read the diff for that.
+# Warns on (worth a look, does not block):
+#   - a hook command without a timeout
+#   - a version that is not semver
+#
+# It cannot tell you whether a hook is a good idea or safe to run. Read the diff
+# for that; see CONTRIBUTING.md for what gets rejected on review.
 
 set -uo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$repo_root"
-
-fail=0
-err() { echo "  FAIL: $*" >&2; fail=1; }
-ok() { echo "  ok: $*"; }
-
-echo "marketplace.json"
-if python3 -m json.tool .claude-plugin/marketplace.json > /dev/null 2>&1; then
-  ok "valid JSON"
-else
-  err "invalid JSON"
-  exit 1
-fi
+cd "$repo_root" || exit 1
 
 python3 - <<'PY'
-import json, os, sys
+import json
+import os
+import re
+import sys
 
+# Keep in sync with https://code.claude.com/docs/en/hooks — that page is the
+# source of truth. Add an event here only after checking it there.
 EVENTS = {
     "PreToolUse", "PostToolUse", "UserPromptSubmit", "Notification",
     "Stop", "SubagentStop", "SessionStart", "SessionEnd", "PreCompact",
 }
 
+REQUIRED_MANIFEST_FIELDS = ("name", "description", "version")
+SEMVER = re.compile(r"^\d+\.\d+\.\d+")
+
 fail = False
+warned = False
 
 
 def err(msg):
@@ -47,21 +52,140 @@ def err(msg):
     fail = True
 
 
+def warn(msg):
+    global warned
+    print(f"  warn: {msg}")
+    warned = True
+
+
 def ok(msg):
     print(f"  ok: {msg}")
 
 
-mp = json.load(open(".claude-plugin/marketplace.json"))
-listed = {p["name"]: p["source"] for p in mp.get("plugins", [])}
+def script_path_from(command):
+    """Extract the script path a hook command runs, relative to the plugin root.
 
-for name, source in listed.items():
+    Commands look like: "${CLAUDE_PLUGIN_ROOT}"/scripts/name.py [args]
+    Returns None when there is nothing after the variable.
+    """
+    tail = command.split("}", 1)[-1] if "}" in command else ""
+    tail = tail.strip().strip('"').strip()
+    if not tail:
+        return None
+    return tail.split()[0].lstrip("/")
+
+
+def check_scripts(base, cfg, label):
+    """Check every command in a hooks.json: variable use, path safety, script sanity."""
+    for event, groups in (cfg.get("hooks") or {}).items():
+        if event not in EVENTS:
+            err(f"{label}: unknown event '{event}'")
+        else:
+            ok(f"{label}: event {event}")
+
+        if not isinstance(groups, list):
+            err(f"{label}: event '{event}' must hold a list")
+            continue
+
+        for group in groups:
+            for hook in group.get("hooks", []):
+                if hook.get("type") != "command":
+                    continue
+
+                command = hook.get("command", "")
+
+                if "CLAUDE_PLUGIN_ROOT" not in command:
+                    err(f"{label}: command does not use ${{CLAUDE_PLUGIN_ROOT}}: {command}")
+                if "/Users/" in command or "/home/" in command or "C:\\" in command:
+                    err(f"{label}: command contains a personal path: {command}")
+                if "timeout" not in hook:
+                    warn(f"{label}: no timeout on the {event} command")
+
+                rel = script_path_from(command)
+                if not rel:
+                    continue
+
+                if ".." in rel.split("/"):
+                    err(f"{label}: script path escapes the plugin directory: {rel}")
+                    continue
+
+                script = os.path.join(base, rel)
+                if not os.path.isfile(script):
+                    err(f"{label}: script {rel} not found")
+                    continue
+                if not os.access(script, os.X_OK):
+                    err(f"{label}: script {rel} is not executable (chmod +x)")
+                    continue
+
+                with open(script, "rb") as fh:
+                    if not fh.read(2) == b"#!":
+                        err(f"{label}: script {rel} has no shebang")
+                        continue
+
+                ok(f"{label}: script {rel} is executable and has a shebang")
+
+
+def load_json(path, label):
+    try:
+        with open(path) as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        err(f"{label}: missing {path}")
+    except json.JSONDecodeError as exc:
+        err(f"{label}: {os.path.basename(path)} is invalid JSON: {exc}")
+    return None
+
+
+# ---------------------------------------------------------------- marketplace
+
+print("marketplace.json")
+mp = load_json(".claude-plugin/marketplace.json", "marketplace")
+if mp is None:
+    sys.exit(1)
+ok("valid JSON")
+
+listed = {}
+for entry in mp.get("plugins", []):
+    name, source = entry.get("name"), entry.get("source")
+    if not name or not source:
+        err(f"marketplace: entry missing name or source: {entry}")
+        continue
+    listed[name] = source
     if not os.path.isdir(source):
-        err(f"{name}: source {source} does not exist")
+        err(f"marketplace: {name} points at {source}, which does not exist")
+    if not entry.get("description"):
+        err(f"marketplace: {name} has no description")
+
+# ------------------------------------------------------------------ _template
+
+print("\nhooks/_template")
+tpl = "hooks/_template"
+if not os.path.isdir(tpl):
+    err("the template is missing; contributors start from it")
+else:
+    # The template is not a real plugin: its name intentionally differs from the
+    # folder and it is not in the marketplace. Everything else must still hold,
+    # or people copy a broken starting point.
+    manifest = load_json(os.path.join(tpl, ".claude-plugin", "plugin.json"), "_template")
+    cfg = load_json(os.path.join(tpl, "hooks", "hooks.json"), "_template")
+    if manifest is not None and cfg is not None:
+        ok("manifest and hooks.json are valid JSON")
+        check_scripts(tpl, cfg, "_template")
+    if "_template" in listed:
+        err("_template must not be listed in marketplace.json")
+
+# ---------------------------------------------------------------------- hooks
 
 on_disk = sorted(
     d for d in os.listdir("hooks")
     if os.path.isdir(os.path.join("hooks", d)) and not d.startswith("_")
 )
+
+for orphan in sorted(set(listed) - set(on_disk)):
+    err(f"marketplace lists {orphan}, but hooks/{orphan} does not exist")
+
+if not on_disk:
+    print("\nno hooks yet")
 
 for name in on_disk:
     print(f"\nhooks/{name}")
@@ -70,70 +194,31 @@ for name in on_disk:
     if name not in listed:
         err(f"{name} is not listed in marketplace.json")
 
-    manifest_path = os.path.join(base, ".claude-plugin", "plugin.json")
-    hooks_path = os.path.join(base, "hooks", "hooks.json")
-
-    for path in (manifest_path, hooks_path):
-        if not os.path.isfile(path):
-            err(f"missing {path}")
-
     if not os.path.isfile(os.path.join(base, "README.md")):
         err(f"{name}: missing README.md")
 
-    if os.path.isfile(manifest_path):
-        try:
-            manifest = json.load(open(manifest_path))
-            if manifest.get("name") != name:
-                err(f"plugin.json name '{manifest.get('name')}' != folder '{name}'")
-            else:
-                ok("plugin.json name matches folder")
-        except json.JSONDecodeError as e:
-            err(f"plugin.json invalid JSON: {e}")
-
-    if not os.path.isfile(hooks_path):
-        continue
-
-    try:
-        cfg = json.load(open(hooks_path))
-    except json.JSONDecodeError as e:
-        err(f"hooks.json invalid JSON: {e}")
-        continue
-
-    for event, groups in (cfg.get("hooks") or {}).items():
-        if event not in EVENTS:
-            err(f"unknown event '{event}'")
+    manifest = load_json(os.path.join(base, ".claude-plugin", "plugin.json"), name)
+    if manifest is not None:
+        for field in REQUIRED_MANIFEST_FIELDS:
+            if not manifest.get(field):
+                err(f"{name}: plugin.json has no {field}")
+        if manifest.get("name") != name:
+            err(f"{name}: plugin.json name '{manifest.get('name')}' != folder '{name}'")
         else:
-            ok(f"event {event}")
+            ok("plugin.json name matches folder")
+        version = str(manifest.get("version", ""))
+        if version and not SEMVER.match(version):
+            warn(f"{name}: version '{version}' is not semver")
 
-        for group in groups:
-            for hook in group.get("hooks", []):
-                if hook.get("type") != "command":
-                    continue
-                command = hook.get("command", "")
-
-                if "CLAUDE_PLUGIN_ROOT" not in command:
-                    err(f"command does not use ${{CLAUDE_PLUGIN_ROOT}}: {command}")
-                if "/Users/" in command or "/home/" in command:
-                    err(f"command contains a personal path: {command}")
-
-                tail = command.split("}")[-1].strip().strip('"').lstrip("/")
-                script = os.path.join(base, tail.split()[0]) if tail else ""
-                if script and os.path.isfile(script):
-                    if os.access(script, os.X_OK):
-                        ok(f"script {tail} exists and is executable")
-                    else:
-                        err(f"script {tail} is not executable (chmod +x)")
-                elif script:
-                    err(f"script {tail} not found at {script}")
+    cfg = load_json(os.path.join(base, "hooks", "hooks.json"), name)
+    if cfg is not None:
+        if not (cfg.get("hooks") or {}):
+            err(f"{name}: hooks.json registers no events")
+        check_scripts(base, cfg, name)
 
 print()
-sys.exit(1 if fail else 0)
+if fail:
+    print("validation failed", file=sys.stderr)
+    sys.exit(1)
+print("all checks passed" + (" (with warnings)" if warned else ""))
 PY
-
-status=$?
-if [[ $status -ne 0 || $fail -ne 0 ]]; then
-  echo "validation failed" >&2
-  exit 1
-fi
-
-echo "all checks passed"
