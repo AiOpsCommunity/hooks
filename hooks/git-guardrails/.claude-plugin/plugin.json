@@ -1,0 +1,6 @@
+{
+  "name": "git-guardrails",
+  "description": "Blocks irreversible git operations: force pushes to protected branches, hard resets over uncommitted work, protected branch deletion and history rewrites.",
+  "version": "1.0.0",
+  "author": { "name": "AiOps Community" }
+}
