@@ -1,0 +1,6 @@
+{
+  "name": "project-checks",
+  "description": "Runs the formatter or linter the project already defines on the file Claude just edited, and returns failures so they are fixed in the same turn.",
+  "version": "1.0.0",
+  "author": { "name": "AiOps Community" }
+}
