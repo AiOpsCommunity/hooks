@@ -10,10 +10,9 @@ they can be installed with one command and updated later.
 
 ## Hooks
 
-_No hooks yet — yours can be the first. See [CONTRIBUTING.md](CONTRIBUTING.md)._
-
 | Hook | Event | Description |
 | :--- | :---- | :---------- |
+| [`block-secret-files`](hooks/block-secret-files/) | `PreToolUse` | Blocks reads and writes of secret files (`.env`, private keys, credential stores) before the tool runs. |
 
 ## Install
 

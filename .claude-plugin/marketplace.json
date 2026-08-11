@@ -3,5 +3,11 @@
   "owner": {
     "name": "AiOps Community"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "block-secret-files",
+      "source": "./hooks/block-secret-files",
+      "description": "PreToolUse hook that blocks reads and writes of secret files such as .env, private keys and credential stores before the tool runs."
+    }
+  ]
 }

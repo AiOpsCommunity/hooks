@@ -1,0 +1,8 @@
+{
+  "name": "block-secret-files",
+  "description": "Blocks reads and writes of secret files (.env, private keys, credential stores) before the tool runs.",
+  "version": "1.0.0",
+  "author": {
+    "name": "AiOps Community"
+  }
+}
