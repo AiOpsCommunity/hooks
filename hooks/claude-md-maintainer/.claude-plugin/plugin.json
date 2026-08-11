@@ -1,0 +1,6 @@
+{
+  "name": "claude-md-maintainer",
+  "description": "Stop hook that collects candidates for CLAUDE.md into a gitignored inbox, plus a skill that verifies them, prunes stale lines and enforces a size budget.",
+  "version": "0.1.0",
+  "author": { "name": "AiOps Community" }
+}

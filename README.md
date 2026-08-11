@@ -10,10 +10,9 @@ they can be installed with one command and updated later.
 
 ## Hooks
 
-_No hooks yet — yours can be the first. See [CONTRIBUTING.md](CONTRIBUTING.md)._
-
 | Hook | Event | Description |
 | :--- | :---- | :---------- |
+| [`claude-md-maintainer`](hooks/claude-md-maintainer/) | `Stop` | Collects candidate CLAUDE.md lines into a local, git-excluded inbox; a bundled skill verifies them, prunes stale lines and enforces a size budget. |
 
 ## Install
 
@@ -57,6 +56,8 @@ real path.
         │   └── hooks.json        # the hook config (same shape as settings.json)
         ├── scripts/
         │   └── <script>          # what the hook actually runs
+        ├── skills/               # optional, only when it serves the hook
+        │   └── <name>/SKILL.md
         └── README.md             # what it does, why, how to test, how to disable
 ```
 
