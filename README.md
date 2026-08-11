@@ -12,7 +12,7 @@ they can be installed with one command and updated later.
 
 | Hook | Event | Description |
 | :--- | :---- | :---------- |
-| [`project-checks`](hooks/project-checks/) | `PostToolUse` | Runs the formatter or linter a project already defines on the file just edited, returning failures so they are fixed in the same turn. Opt-in per project. |
+| [`project-checks`](hooks/project-checks/) | `PostToolUse` | Runs the formatter or linter a project already defines on the file just edited, returning failures so they are fixed in the same turn. Runs only in directories you mark as trusted. |
 
 ## Install
 

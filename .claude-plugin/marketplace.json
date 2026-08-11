@@ -7,7 +7,7 @@
     {
       "name": "project-checks",
       "source": "./hooks/project-checks",
-      "description": "PostToolUse hook that runs the formatter or linter a project already defines on the file just edited, returning failures so they are fixed in the same turn. Opt-in per project."
+      "description": "PostToolUse hook that runs the formatter or linter a project already defines on the file just edited, returning failures so they are fixed in the same turn. Runs only inside directories you mark as trusted."
     }
   ]
 }

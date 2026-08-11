@@ -4,21 +4,32 @@ Runs the formatter or linter the project already has on the file Claude just edi
 
 **Event:** `PostToolUse` **Matcher:** `Write|Edit|NotebookEdit` **Script:** `scripts/project-checks.py` (Python 3, no dependencies)
 
-## Opt in first
+## Trusted directories only
 
-**This hook does nothing until a project opts in.** Add one file:
+**This hook does nothing until you name the directories it may run in.** When you enable the plugin, Claude Code asks for them:
 
-```bash
-mkdir -p .claude && echo '{}' > .claude/project-checks.json
+```text
+/plugin install project-checks@aiops-hooks
+/plugin enable project-checks          # prompts for trusted directories
 ```
 
-That empty object is the whole opt-in. Detection still does the work — you are not specifying commands, only granting permission once.
+Point it at where your own work lives, for example `~/Projects`. Everything under a trusted directory is trusted; everything else is silent.
 
-The reason is worth stating plainly, because it is the one thing that could bite you. This hook runs commands defined by the repository it is looking at. `npm run format` executes whatever that project's `package.json` says it should. In a repository you wrote, that is exactly what you want. In a repository you cloned to take a look at, it is somebody else's code running on your machine because Claude touched a file — with your shell, your credentials, no confirmation. Making it opt-in means opening an unfamiliar repo does nothing at all.
+The reason is worth stating plainly, because it is the one thing that could bite you. This hook runs commands defined by the repository it is looking at. `npm run format` executes whatever that project's `package.json` says it should. In a repository you wrote, that is exactly what you want. In a repository you cloned to take a look at, it is somebody else's code running on your machine because Claude touched a file — with your shell, your credentials, no confirmation.
+
+**The list lives in your user settings, never in a project.** An earlier version of this hook took its opt-in from a `.claude/project-checks.json` inside the repository, which is worthless as a trust boundary: any repository you clone can ship that file and grant itself permission. Claude Code refuses to read project-level `pluginConfigs` for exactly this reason, and this hook now follows the same rule.
+
+The trade-off is honest rather than hidden: trusting a directory means trusting everything you put in it. If you clone an unfamiliar repository into a trusted folder, it is trusted. Clone it somewhere else.
+
+Installed by hand instead of as a plugin? Then the list comes from `~/.claude/project-checks.json`:
+
+```json
+{ "trustedRoots": ["~/Projects", "~/work"] }
+```
 
 ## What it does
 
-Once a project has opted in, it walks up from the edited file to the project root and takes the first thing it recognises:
+Inside a trusted directory, it walks up from the edited file to the project root and takes the first thing it recognises:
 
 | Source | Looks for | Runs |
 | :-- | :-- | :-- |
@@ -43,7 +54,7 @@ Skipped by extension: `.md`, `.mdx`, `.json`, `.lock`, `.txt`, `.csv`, images an
 
 ## Configure
 
-All keys optional, at `.claude/project-checks.json`:
+Per-project tuning, all keys optional, at `<project>/.claude/project-checks.json`. This file adjusts *how* the hook behaves; it cannot grant trust, and inside an untrusted directory it is never even read.
 
 ```json
 {
@@ -61,12 +72,15 @@ Invalid JSON here is reported rather than ignored: you wrote the file on purpose
 ## Test it
 
 ```bash
-mkdir -p .claude && echo '{}' > .claude/project-checks.json
-echo '{"tool_input":{"file_path":"'"$PWD"'/src/Example.php"}}' | ./scripts/project-checks.py --dry-run
+CLAUDE_PLUGIN_OPTION_TRUSTED_ROOTS="$PWD" \
+  sh -c 'echo "{\"tool_input\":{\"file_path\":\"$PWD/src/Example.php\"}}"' \
+  | ./scripts/project-checks.py --dry-run
 ```
 
-`--dry-run` prints the command it would run and changes nothing. Without the config file, it prints nothing at all — that is the opt-in working.
+`--dry-run` prints the command it would run and changes nothing. Drop the environment variable and it prints nothing at all — that is the trust gate working.
 
 ## Disable
 
-`/plugin uninstall project-checks@aiops-hooks`. For a single project, set `"enabled": false` or delete `.claude/project-checks.json`.
+`/plugin uninstall project-checks@aiops-hooks`, or remove the directory from the trusted list. For a single project inside a trusted directory, set `"enabled": false` in its `.claude/project-checks.json`.
+
+The plugin also ships `defaultEnabled: false`, so installing it does not switch it on. You enable it deliberately, and that is when you are asked which directories it may touch.

@@ -4,7 +4,11 @@
       {
         "matcher": "Write|Edit|NotebookEdit",
         "hooks": [
-          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/project-checks.py", "timeout": 90 }
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/project-checks.py",
+            "timeout": 90
+          }
         ]
       }
     ]
