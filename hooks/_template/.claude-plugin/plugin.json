@@ -1,0 +1,8 @@
+{
+  "name": "my-new-hook",
+  "description": "One sentence: what this hook does and when it fires.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Your Name"
+  }
+}

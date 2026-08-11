@@ -1,0 +1,94 @@
+# AiOps Community hooks
+
+A collection of [Claude Code hooks](https://code.claude.com/docs/en/hooks), packaged as plugins so
+they can be installed with one command and updated later.
+
+> **Hooks are Claude Code only.** Unlike skills, there is no `.hook` file and no upload in
+> claude.ai. A hook is shell configuration that Claude Code runs at a lifecycle event, so the only
+> shareable form is a plugin containing a `hooks/hooks.json`. That is what every entry in this repo
+> is.
+
+## Hooks
+
+_No hooks yet — yours can be the first. See [CONTRIBUTING.md](CONTRIBUTING.md)._
+
+| Hook | Event | Description |
+| :--- | :---- | :---------- |
+
+## Install
+
+```text
+/plugin marketplace add AiOpsCommunity/hooks
+/plugin install <hook-name>@aiops-hooks
+/reload-plugins
+```
+
+Verify with `/hooks`, which lists every registered hook and where it came from. Update later with
+`/plugin marketplace update aiops-hooks`.
+
+### Without the marketplace
+
+Copy the scripts somewhere stable and register the hook yourself in `~/.claude/settings.json`
+(personal) or `.claude/settings.json` (one project). Each hook's own README shows the settings
+block, since `${CLAUDE_PLUGIN_ROOT}` does not exist outside a plugin and has to be replaced with a
+real path.
+
+## Repo layout
+
+```
+.
+├── README.md
+├── CONTRIBUTING.md
+├── .claude-plugin/
+│   └── marketplace.json          # plugin catalog for /plugin install
+├── scripts/
+│   └── validate.sh               # JSON + event name + permission checks
+└── hooks/
+    ├── _template/                # copy this to start a new hook
+    └── <hook-name>/
+        ├── .claude-plugin/
+        │   └── plugin.json       # manifest, metadata only
+        ├── hooks/
+        │   └── hooks.json        # the hook config (same shape as settings.json)
+        ├── scripts/
+        │   └── <script>          # what the hook actually runs
+        └── README.md             # what it does, why, how to test, how to disable
+```
+
+The nesting looks odd at first: `hooks/<hook-name>/hooks/hooks.json`. The outer `hooks/` is this
+repo's catalog directory. The inner one is required by Claude Code, which looks for `hooks/hooks.json`
+at the root of a plugin. Manifests live in `.claude-plugin/`, everything functional lives at the
+plugin root.
+
+## Add a new hook
+
+1. Copy the template and rename it (kebab-case, this becomes the plugin name):
+
+   ```bash
+   cp -r hooks/_template hooks/my-new-hook
+   ```
+
+2. Fill in `.claude-plugin/plugin.json`, `hooks/hooks.json`, the script, and the README.
+3. Add a plugin entry to [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) and a
+   row to the table above.
+4. Run `./scripts/validate.sh` and test locally (see CONTRIBUTING.md).
+
+## Events you can hook into
+
+| Event | Fires | Typical use |
+| :--- | :--- | :--- |
+| `PreToolUse` | Before a tool runs, can block it | Guardrails, policy checks |
+| `PostToolUse` | After a tool succeeds | Formatting, linting, tests |
+| `UserPromptSubmit` | When a prompt is submitted | Inject context, reject prompts |
+| `Notification` | On a Claude Code notification | Desktop alerts, Slack pings |
+| `Stop` | When the main agent finishes | Wrap-up work, changelog updates |
+| `SubagentStop` | When a subagent finishes | Collect subagent output |
+| `SessionStart` | On start or resume | Load branch state, env checks |
+| `SessionEnd` | On session end | Cleanup, logging |
+| `PreCompact` | Before context compaction | Persist state that would be lost |
+
+`matcher` filters within an event. For tool events it matches the tool name and accepts regex
+alternation (`Write|Edit`). Leave it out to match everything.
+
+Check [the hooks reference](https://code.claude.com/docs/en/hooks) before relying on details here;
+that page is the source of truth and this table is a summary.
