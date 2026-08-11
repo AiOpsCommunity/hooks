@@ -4,7 +4,12 @@
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/git-guardrails.py", "timeout": 10 }
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/git-guardrails.py",
+            "if": "Bash(git *)",
+            "timeout": 10
+          }
         ]
       }
     ]

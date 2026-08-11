@@ -23,6 +23,12 @@ Force pushing a feature branch is allowed, because that is normal work. It print
 
 Explicitly left alone: `git clean -n` and `--dry-run` (they delete nothing), and `git restore --staged` / `--cached` (they only unstage; the working tree is untouched).
 
+## Two filters, on purpose
+
+The hook config carries `"if": "Bash(git *)"` alongside the `Bash` matcher. That is Claude Code's own permission-rule filter, so the script is not even spawned for `npm test` or `ls`. It saves a process on most Bash calls.
+
+It is not the security boundary, and the script does not rely on it. That filter is documented as best-effort and fails open when it cannot parse a command, so the parsing below runs regardless. Two cheap filters that both fail open are better than one that has to be perfect.
+
 ## How it reads a command
 
 The command line is tokenised with `shlex` first, then split on shell operators. That order matters: splitting the raw text on `;` or `&&` first would cut through quoted arguments, so `git commit -m 'fix; done'` would become an unbalanced fragment that the parser rejects — and the whole command would slip past every check without a word. Tokenising first keeps quotes intact, and operators are still recognised without surrounding spaces (`echo hi;git push --force` is two commands).
