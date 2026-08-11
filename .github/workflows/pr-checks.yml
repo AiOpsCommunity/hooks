@@ -1,0 +1,92 @@
+name: PR checks
+
+# Runs on every pull request, and on main so the check names show up in the
+# ruleset picker and main is never left broken.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Read-only. Nothing here needs to write to the repo, and a workflow that
+# validates other people's shell should hold the smallest token it can.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  structure:
+    name: structure
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to a SHA rather than a tag: a mutable tag on a repo that
+      # distributes shell is an unnecessary supply-chain risk.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: validate.sh
+        run: ./scripts/validate.sh
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: shellcheck
+        run: |
+          mapfile -t files < <(git ls-files '*.sh')
+          if [ ${#files[@]} -eq 0 ]; then echo "no shell scripts"; exit 0; fi
+          printf 'checking: %s\n' "${files[@]}"
+          # severity=warning: real problems fail the build, pure style
+          # suggestions do not. A contributor should not have a hook rejected
+          # over SC2001.
+          shellcheck --severity=warning "${files[@]}"
+
+      - name: python syntax
+        run: |
+          mapfile -t files < <(git ls-files '*.py')
+          if [ ${#files[@]} -eq 0 ]; then echo "no python scripts"; exit 0; fi
+          printf 'checking: %s\n' "${files[@]}"
+          python3 -m py_compile "${files[@]}"
+
+      - name: json formatting
+        run: |
+          mapfile -t files < <(git ls-files '*.json')
+          for f in "${files[@]}"; do
+            python3 -m json.tool "$f" > /dev/null || { echo "invalid JSON: $f"; exit 1; }
+          done
+          echo "all JSON parses"
+
+  pr-policy:
+    name: pr-policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Needs history on both sides to find the merge base.
+          fetch-depth: 0
+
+      - name: one hook per PR, registered properly
+        run: ./scripts/pr-policy.sh "origin/${{ github.base_ref }}"
+
+  review-flags:
+    name: review-flags (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Always green on purpose. See the comment at the top of the script:
+      # every pattern it looks for has legitimate uses, so it points a human
+      # at the interesting lines instead of pretending to judge them.
+      - name: flag lines worth reading
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ./scripts/review-flags.sh "origin/${{ github.base_ref }}"
+          else
+            ./scripts/review-flags.sh
+          fi
