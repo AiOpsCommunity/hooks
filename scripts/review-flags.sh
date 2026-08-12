@@ -24,11 +24,11 @@ base="${1:-}"
 
 if [[ -n "$base" ]] && git rev-parse --verify --quiet "$base" > /dev/null; then
   merge_base="$(git merge-base "$base" HEAD)"
-  files="$(git diff --name-only "$merge_base" HEAD -- 'hooks/*' | grep -E '\.(py|sh|js|ts|rb|pl)$')"
+  files="$(git diff --name-only "$merge_base" HEAD -- 'hooks/*' 'monitors/*' | grep -E '\.(py|sh|js|ts|rb|pl)$')"
   scope="changed against $base"
 else
-  files="$(git ls-files 'hooks/*' | grep -E '\.(py|sh|js|ts|rb|pl)$')"
-  scope="all hook scripts"
+  files="$(git ls-files 'hooks/*' 'monitors/*' | grep -E '\.(py|sh|js|ts|rb|pl)$')"
+  scope="all hook and monitor scripts"
 fi
 
 FILES="$files" SCOPE="$scope" python3 - <<'PY'
@@ -88,7 +88,7 @@ out.append("## Review flags\n")
 out.append(f"Scope: {scope} ({len(files)} file(s)).\n")
 
 if not files:
-    out.append("No hook scripts in scope.\n")
+    out.append("No hook or monitor scripts in scope.\n")
 elif not rows:
     out.append("Nothing flagged. Still read the diff — this script only knows patterns.\n")
 else:

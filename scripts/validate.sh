@@ -168,6 +168,98 @@ def check_scripts(base, cfg, label):
                 ok(f"{label}: script {rel} is executable and has a shebang")
 
 
+def check_monitors(base, entries, label):
+    """Check a monitors.json: shape, required fields, and any bundled script.
+
+    A monitor is a long-lived background command whose stdout reaches Claude as
+    notifications, so the bar is the same as for hooks. Unlike a hook it often
+    runs a plain shell command (`tail -F ...`) rather than a bundled script, so
+    ${CLAUDE_PLUGIN_ROOT} is required only when it does reference one.
+    """
+    if not isinstance(entries, list):
+        err(f"{label}: monitors.json must contain a JSON array")
+        return
+    if not entries:
+        err(f"{label}: monitors.json is empty")
+        return
+
+    seen = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            err(f"{label}: every monitor must be an object")
+            continue
+
+        name = entry.get("name")
+        command = entry.get("command", "")
+        for field in ("name", "command", "description"):
+            if not entry.get(field):
+                err(f"{label}: a monitor has no {field}")
+
+        if name:
+            if name in seen:
+                err(f"{label}: two monitors are both called '{name}'")
+            seen.add(name)
+
+        when = entry.get("when")
+        if when is not None and when != "always" and not when.startswith("on-skill-invoke:"):
+            err(
+                f"{label}: monitor '{name}' has when='{when}'; only 'always' or "
+                "'on-skill-invoke:<skill>' are valid"
+            )
+
+        # Documented as rejected: a monitor command runs through a shell, so
+        # Claude Code refuses to substitute user config into it.
+        if "${user_config." in command:
+            err(
+                f"{label}: monitor '{name}' references ${{user_config.*}}, which "
+                "Claude Code rejects for shell commands. Read the value from a "
+                "config file in the script instead"
+            )
+
+        if "/Users/" in command or "/home/" in command or "C:\\" in command:
+            err(f"{label}: monitor '{name}' hard-codes a personal path: {command}")
+
+        if "CLAUDE_PLUGIN_ROOT" not in command:
+            ok(f"{label}: monitor {name} (no bundled script)")
+            continue
+
+        rel = script_path_from({"command": command})
+        if not rel:
+            continue
+        if ".." in rel.split("/"):
+            err(f"{label}: monitor '{name}' escapes the plugin directory: {rel}")
+            continue
+
+        script = os.path.join(base, rel)
+        if not os.path.isfile(script):
+            err(f"{label}: monitor '{name}' script {rel} not found")
+        elif not os.access(script, os.X_OK):
+            err(f"{label}: monitor '{name}' script {rel} is not executable (chmod +x)")
+        else:
+            with open(script, "rb") as fh:
+                if fh.read(2) != b"#!":
+                    err(f"{label}: monitor '{name}' script {rel} has no shebang")
+                else:
+                    ok(f"{label}: monitor {name} runs {rel}")
+
+
+def check_manifest(base, name):
+    """Manifest checks shared by hooks and monitors."""
+    manifest = load_json(os.path.join(base, ".claude-plugin", "plugin.json"), name)
+    if manifest is None:
+        return
+    for field in REQUIRED_MANIFEST_FIELDS:
+        if not manifest.get(field):
+            err(f"{name}: plugin.json has no {field}")
+    if manifest.get("name") != name:
+        err(f"{name}: plugin.json name '{manifest.get('name')}' != folder '{name}'")
+    else:
+        ok("plugin.json name matches folder")
+    version = str(manifest.get("version", ""))
+    if version and not SEMVER.match(version):
+        warn(f"{name}: version '{version}' is not semver")
+
+
 def load_json(path, label):
     try:
         with open(path) as fh:
@@ -199,65 +291,72 @@ for entry in mp.get("plugins", []):
     if not entry.get("description"):
         err(f"marketplace: {name} has no description")
 
-# ------------------------------------------------------------------ _template
-
-print("\nhooks/_template")
-tpl = "hooks/_template"
-if not os.path.isdir(tpl):
-    err("the template is missing; contributors start from it")
-else:
-    # The template is not a real plugin: its name intentionally differs from the
-    # folder and it is not in the marketplace. Everything else must still hold,
-    # or people copy a broken starting point.
-    manifest = load_json(os.path.join(tpl, ".claude-plugin", "plugin.json"), "_template")
-    cfg = load_json(os.path.join(tpl, "hooks", "hooks.json"), "_template")
-    if manifest is not None and cfg is not None:
-        ok("manifest and hooks.json are valid JSON")
-        check_scripts(tpl, cfg, "_template")
-    if "_template" in listed:
-        err("_template must not be listed in marketplace.json")
-
-# ---------------------------------------------------------------------- hooks
-
-on_disk = sorted(
-    d for d in os.listdir("hooks")
-    if os.path.isdir(os.path.join("hooks", d)) and not d.startswith("_")
+# Hooks and monitors are both plugins and are checked the same way. Only the
+# config file inside them differs, so the loop is shared.
+KINDS = (
+    ("hooks", os.path.join("hooks", "hooks.json")),
+    ("monitors", os.path.join("monitors", "monitors.json")),
 )
 
-for orphan in sorted(set(listed) - set(on_disk)):
-    err(f"marketplace lists {orphan}, but hooks/{orphan} does not exist")
 
-if not on_disk:
-    print("\nno hooks yet")
-
-for name in on_disk:
-    print(f"\nhooks/{name}")
-    base = os.path.join("hooks", name)
-
-    if name not in listed:
-        err(f"{name} is not listed in marketplace.json")
-
-    if not os.path.isfile(os.path.join(base, "README.md")):
-        err(f"{name}: missing README.md")
-
-    manifest = load_json(os.path.join(base, ".claude-plugin", "plugin.json"), name)
-    if manifest is not None:
-        for field in REQUIRED_MANIFEST_FIELDS:
-            if not manifest.get(field):
-                err(f"{name}: plugin.json has no {field}")
-        if manifest.get("name") != name:
-            err(f"{name}: plugin.json name '{manifest.get('name')}' != folder '{name}'")
-        else:
-            ok("plugin.json name matches folder")
-        version = str(manifest.get("version", ""))
-        if version and not SEMVER.match(version):
-            warn(f"{name}: version '{version}' is not semver")
-
-    cfg = load_json(os.path.join(base, "hooks", "hooks.json"), name)
-    if cfg is not None:
+def check_config(base, kind, cfg, label):
+    if kind == "hooks":
         if not (cfg.get("hooks") or {}):
-            err(f"{name}: hooks.json registers no events")
-        check_scripts(base, cfg, name)
+            err(f"{label}: hooks.json registers no events")
+        check_scripts(base, cfg, label)
+    else:
+        check_monitors(base, cfg, label)
+
+
+all_on_disk = set()
+
+for kind, config_rel in KINDS:
+    if not os.path.isdir(kind):
+        continue
+
+    tpl = os.path.join(kind, "_template")
+    print(f"\n{tpl}")
+    if not os.path.isdir(tpl):
+        err(f"the {kind} template is missing; contributors start from it")
+    else:
+        # The template is not a real plugin: its name intentionally differs from
+        # the folder and it is not in the marketplace. Everything else must
+        # still hold, or people copy a broken starting point.
+        manifest = load_json(os.path.join(tpl, ".claude-plugin", "plugin.json"), "_template")
+        cfg = load_json(os.path.join(tpl, config_rel), "_template")
+        if manifest is not None and cfg is not None:
+            ok("manifest and config are valid JSON")
+            check_config(tpl, kind, cfg, f"{kind}/_template")
+        if "_template" in listed:
+            err("_template must not be listed in marketplace.json")
+
+    on_disk = sorted(
+        d for d in os.listdir(kind)
+        if os.path.isdir(os.path.join(kind, d)) and not d.startswith("_")
+    )
+    all_on_disk.update(on_disk)
+
+    if not on_disk:
+        print(f"\nno {kind} yet")
+
+    for name in on_disk:
+        print(f"\n{kind}/{name}")
+        base = os.path.join(kind, name)
+
+        if name not in listed:
+            err(f"{name} is not listed in marketplace.json")
+
+        if not os.path.isfile(os.path.join(base, "README.md")):
+            err(f"{name}: missing README.md")
+
+        check_manifest(base, name)
+
+        cfg = load_json(os.path.join(base, config_rel), name)
+        if cfg is not None:
+            check_config(base, kind, cfg, name)
+
+for orphan in sorted(set(listed) - all_on_disk):
+    err(f"marketplace lists {orphan}, but no hooks/{orphan} or monitors/{orphan} exists")
 
 print()
 if fail:
