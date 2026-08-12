@@ -27,10 +27,9 @@ _No hooks yet — yours can be the first. See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Monitors
 
-_No monitors yet._
-
 | Monitor | Watches | Description |
 | :--- | :---- | :---------- |
+| [`ci-watch`](monitors/ci-watch/) | GitHub Actions | Reports a finished workflow run for the current branch. Failures always; successes only when it saw the run start. |
 
 ## Install
 

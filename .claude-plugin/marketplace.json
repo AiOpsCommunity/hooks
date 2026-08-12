@@ -4,5 +4,11 @@
   "owner": {
     "name": "AiOps Community"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "ci-watch",
+      "source": "./monitors/ci-watch",
+      "description": "Monitor that watches GitHub Actions for the branch you are on and reports a finished run, so a red build reaches the session without anyone going to look for it."
+    }
+  ]
 }
