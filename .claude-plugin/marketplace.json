@@ -4,5 +4,11 @@
   "owner": {
     "name": "AiOps Community"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "log-watch",
+      "source": "./monitors/log-watch",
+      "description": "Monitor that watches the log files you name in your own config and reports only the lines matching your patterns, with rate limiting so a noisy log cannot flood the session."
+    }
+  ]
 }

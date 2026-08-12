@@ -27,10 +27,9 @@ _No hooks yet — yours can be the first. See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Monitors
 
-_No monitors yet._
-
 | Monitor | Watches | Description |
 | :--- | :---- | :---------- |
+| [`log-watch`](monitors/log-watch/) | Log files | Reports only the lines matching patterns you configure, rate limited so a noisy log cannot flood the session. |
 
 ## Install
 
