@@ -10,10 +10,9 @@ they can be installed with one command and updated later.
 
 ## Hooks
 
-_No hooks yet — yours can be the first. See [CONTRIBUTING.md](CONTRIBUTING.md)._
-
 | Hook | Event | Description |
 | :--- | :---- | :---------- |
+| [`git-guardrails`](hooks/git-guardrails/) | `PreToolUse` | Blocks irreversible git operations: force pushes to protected branches, hard resets over uncommitted work, protected branch deletion, untracked file wipes and history rewrites. |
 
 ## Install
 
