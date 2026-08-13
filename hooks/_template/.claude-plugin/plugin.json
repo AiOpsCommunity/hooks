@@ -1,8 +1,13 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "my-new-hook",
   "description": "One sentence: what this hook does and when it fires.",
   "version": "0.1.0",
   "author": {
     "name": "Your Name"
-  }
+  },
+  "keywords": ["hook"],
+  "license": "MIT",
+  "homepage": "https://github.com/AiOpsCommunity/hooks/tree/main/hooks/my-new-hook",
+  "repository": "https://github.com/AiOpsCommunity/hooks"
 }

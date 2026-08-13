@@ -12,6 +12,7 @@ they can be installed with one command and updated later.
 
 | Hook | Event | Description |
 | :--- | :---- | :---------- |
+| [`git-guardrails`](hooks/git-guardrails/) | `PreToolUse` | Blocks irreversible git operations: force pushes to protected branches, hard resets over uncommitted work, protected branch deletion, untracked file wipes and history rewrites. |
 | [`project-checks`](hooks/project-checks/) | `PostToolUse` | Runs the formatter or linter a project already defines on the file just edited, returning failures so they are fixed in the same turn. Runs only in directories you mark as trusted. |
 
 ## Install
@@ -91,8 +92,26 @@ plugin root.
 | `SessionEnd` | On session end | Cleanup, logging |
 | `PreCompact` | Before context compaction | Persist state that would be lost |
 
-`matcher` filters within an event. For tool events it matches the tool name and accepts regex
-alternation (`Write|Edit`). Leave it out to match everything.
+That table is the common set, not the whole list — Claude Code ships around thirty events, including
+`PostToolUseFailure`, `PermissionRequest`, `FileChanged`, `SubagentStart` and `TaskCompleted`.
+`validate.sh` only *warns* about an event it does not recognise, so a hook on a newer event is never
+blocked by this repo being a release behind.
 
-Check [the hooks reference](https://code.claude.com/docs/en/hooks) before relying on details here;
-that page is the source of truth and this table is a summary.
+`matcher` filters within an event. For tool events it matches the tool name and accepts regex
+alternation (`Write|Edit`); MCP tools are matched as `mcp__<server>__<tool>`. Leave it out to match
+everything.
+
+## Things worth knowing
+
+| Feature | What it gives you |
+| :--- | :--- |
+| `if: "Bash(git *)"` | Narrows a tool hook further than `matcher` can, using permission-rule syntax. Strips `NAME=value` prefixes and fails open when it cannot parse. |
+| `args` (exec form) | Spawns the script directly instead of through `sh -c`. No quoting traps. See CONTRIBUTING.md. |
+| `userConfig` | Values Claude Code prompts for at enable time, stored in *user* settings and passed to the hook as `CLAUDE_PLUGIN_OPTION_<KEY>`. The right place for anything that decides what a hook may do. |
+| `defaultEnabled: false` | Ships the plugin installed but switched off, for hooks that add cost or scope. |
+| `async` / `asyncRewake` | Runs a slow hook in the background; `asyncRewake` wakes Claude on exit 2 with the output. |
+| `${CLAUDE_PLUGIN_DATA}` | A per-plugin directory that survives updates, unlike `${CLAUDE_PLUGIN_ROOT}`. |
+
+Check [the hooks reference](https://code.claude.com/docs/en/hooks) and the
+[plugins reference](https://code.claude.com/docs/en/plugins-reference) before relying on details
+here; those pages are the source of truth and this is a summary.

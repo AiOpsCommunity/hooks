@@ -59,6 +59,33 @@ jobs:
           done
           echo "all JSON parses"
 
+  plugin-validate:
+    name: plugin-validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: validate each plugin manifest
+        run: |
+          # --strict turns warnings into errors: a misspelled or wrongly typed
+          # manifest field still loads at runtime, which is exactly why it
+          # should be caught here instead of by a user.
+          status=0
+          for dir in hooks/*/; do
+            echo "== ${dir}"
+            claude plugin validate "$dir" --strict || status=1
+          done
+          exit $status
+
+      - name: validate the marketplace manifest
+        run: |
+          # Not --strict: the official validator warns when the catalog has no
+          # plugins, which is the correct state for main until a hook merges.
+          claude plugin validate .
+
   pr-policy:
     name: pr-policy
     if: github.event_name == 'pull_request'
