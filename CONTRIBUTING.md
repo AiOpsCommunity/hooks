@@ -12,6 +12,10 @@ event. Review PRs here with that in mind, and expect the same of your own.
 - **One hook per pull request.**
 - Folder name is **kebab-case** and becomes the plugin name. Keep `name` in `plugin.json` equal to
   the folder name.
+- A hook may ship a **skill** alongside it, in `skills/<name>/SKILL.md`, when that skill exists to
+  serve the hook — a hook that collects something and a skill that acts on it are one thing, and
+  splitting them means installing two pieces that are useless apart. A skill that stands on its own
+  belongs in [AiOpsCommunity/skills](https://github.com/AiOpsCommunity/skills) instead.
 - Every hook ships a `README.md` covering: what it does, which event and matcher, what it blocks or
   changes, how to test it, and how to disable it.
 - Reference bundled scripts with **exec form**: put the interpreter in `command` and the script in
