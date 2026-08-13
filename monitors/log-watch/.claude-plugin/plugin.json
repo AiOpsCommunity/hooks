@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "log-watch",
+  "description": "Watches log files you name in your own config and reports only the lines matching your patterns, so a runtime error reaches the session without anyone tailing a log.",
+  "version": "0.1.0",
+  "author": { "name": "AiOps Community" },
+  "keywords": ["monitor", "logs", "errors"],
+  "license": "MIT",
+  "homepage": "https://github.com/AiOpsCommunity/hooks/tree/main/monitors/log-watch",
+  "repository": "https://github.com/AiOpsCommunity/hooks"
+}
