@@ -11,6 +11,11 @@
       "description": "PreToolUse hook that blocks reads and writes of secret files such as .env, private keys and credential stores before the tool runs."
     },
     {
+      "name": "claude-md-maintainer",
+      "source": "./hooks/claude-md-maintainer",
+      "description": "Stop hook that collects candidate CLAUDE.md lines into a local, git-excluded inbox, plus a skill that verifies them against the codebase, prunes stale lines and enforces a size budget."
+    },
+    {
       "name": "git-guardrails",
       "source": "./hooks/git-guardrails",
       "description": "PreToolUse hook that blocks irreversible git operations: force pushes to protected branches, hard resets over uncommitted work, protected branch deletion, untracked file wipes and history rewrites."
