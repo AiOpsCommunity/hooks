@@ -4,7 +4,7 @@
 #
 #   - one hook per pull request
 #   - a new hook is registered in marketplace.json and listed in the README
-#   - the template is not silently modified alongside a hook
+#   - an existing template is not silently modified alongside a hook
 #
 # Usage: ./scripts/pr-policy.sh [base-ref]     (default: origin/main)
 #
@@ -74,13 +74,30 @@ for path in changed:
     if len(parts) >= 2 and parts[0] in KINDS and (parts[0], parts[1]) not in touched:
         touched.append((parts[0], parts[1]))
 
-templates = [k for k, n in touched if n.startswith("_")]
+templates = [(k, n) for k, n in touched if n.startswith("_")]
 components = [(k, n) for k, n in touched if not n.startswith("_")]
 
-if templates and components:
+# Editing a template that people already build on is what deserves its own
+# review. A template that does not exist at the base is a new kind being
+# introduced, and reviewing that starting point without the first thing built
+# from it is guesswork, so the two belong together.
+edited_templates = [
+    (k, n) for k, n in templates
+    if existed_at_base(f"{k}/{n}/.claude-plugin/plugin.json")
+]
+new_templates = [t for t in templates if t not in edited_templates]
+
+if edited_templates and components:
     err(
-        "this PR changes both a template and a component. Split them: a template "
-        "change affects everyone who starts a new one and deserves its own review."
+        "this PR changes both an existing template and a component. Split them: a "
+        "template change affects everyone who starts a new one and deserves its "
+        "own review."
+    )
+elif new_templates and components:
+    ok(
+        "new template "
+        + ", ".join(sorted(f"{k}/{n}" for k, n in new_templates))
+        + " ships with its first component, which is how a new kind arrives"
     )
 
 if not components:

@@ -1,0 +1,7 @@
+[
+  {
+    "name": "log-watch",
+    "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/log-watch.py \"${CLAUDE_PLUGIN_DATA}\" \"${CLAUDE_PROJECT_DIR}\"",
+    "description": "Error lines in the log files you configured"
+  }
+]
