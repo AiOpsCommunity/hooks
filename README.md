@@ -12,6 +12,7 @@ they can be installed with one command and updated later.
 
 | Hook | Event | Description |
 | :--- | :---- | :---------- |
+| [`block-secret-files`](hooks/block-secret-files/) | `PreToolUse` | Blocks reads and writes of secret files (`.env`, private keys, credential stores) before the tool runs. |
 | [`claude-md-maintainer`](hooks/claude-md-maintainer/) | `Stop` | Collects candidate CLAUDE.md lines into a local, git-excluded inbox; a bundled skill verifies them, prunes stale lines and enforces a size budget. |
 | [`git-guardrails`](hooks/git-guardrails/) | `PreToolUse` | Blocks irreversible git operations: force pushes to protected branches, hard resets over uncommitted work, protected branch deletion, untracked file wipes and history rewrites. |
 | [`project-checks`](hooks/project-checks/) | `PostToolUse` | Runs the formatter or linter a project already defines on the file just edited, returning failures so they are fixed in the same turn. Runs only in directories you mark as trusted. |
