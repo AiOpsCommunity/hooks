@@ -18,8 +18,23 @@ event. Review PRs here with that in mind, and expect the same of your own.
   belongs in [AiOpsCommunity/skills](https://github.com/AiOpsCommunity/skills) instead.
 - Every hook ships a `README.md` covering: what it does, which event and matcher, what it blocks or
   changes, how to test it, and how to disable it.
-- Reference bundled scripts with `"${CLAUDE_PLUGIN_ROOT}"/scripts/<name>`, quoted. Never a relative
-  path, never a path on your own machine.
+- Reference bundled scripts with **exec form**: put the interpreter in `command` and the script in
+  `args`, using `${CLAUDE_PLUGIN_ROOT}`. Never a relative path, never a path on your own machine.
+
+  ```json
+  { "type": "command", "command": "python3",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/my-hook.py"], "timeout": 10 }
+  ```
+
+  Exec form spawns the script directly instead of handing a string to `sh -c`, so quoting, spaces
+  and `$` in a path stop being your problem. Shell form still works and is the right choice when you
+  genuinely need a pipe or `&&`, but then every placeholder must be double-quoted.
+- Configuration that decides **what a hook is allowed to do** belongs in `userConfig` in
+  `plugin.json`, not in a file inside the project. Claude Code prompts for those values when the
+  plugin is enabled, stores them in user settings, and passes them to the hook as
+  `CLAUDE_PLUGIN_OPTION_<KEY>`. A config file in the repository can be supplied by any repository you
+  clone, which makes it useless as a trust boundary — Claude Code ignores project-level
+  `pluginConfigs` for exactly this reason.
 - Scripts must be executable (`chmod +x`) and start with a shebang.
 - Exit codes: `0` is success, `2` blocks the action and sends stderr back to Claude, anything else
   is a non-blocking error shown to the user. If you print JSON on stdout, exit `0` and print
@@ -41,10 +56,15 @@ event. Review PRs here with that in mind, and expect the same of your own.
 ## Before opening a PR
 
 ```bash
-./scripts/validate.sh            # marketplace.json, plugin.json, hooks.json, events, permissions
-./scripts/pr-policy.sh           # one hook per PR, and the hook is registered
-./scripts/review-flags.sh        # lines a reviewer should read closely (never fails)
+./scripts/validate.sh                        # repo structure, registration, script permissions
+./scripts/pr-policy.sh                       # one hook per PR, and the hook is registered
+./scripts/review-flags.sh                    # lines a reviewer should read closely (never fails)
+claude plugin validate ./hooks/<name> --strict   # the official manifest schema check
 ```
+
+The last one is Claude Code's own validator and catches things ours cannot: a misspelled manifest
+field, a value of the wrong type, a field left over from another tool's manifest. `--strict` makes
+warnings fail, which is what you want before publishing.
 
 CI runs the same three scripts on every pull request, so a green run here is a green run there.
 `structure`, `lint` and `pr-policy` must pass before a PR can merge. `review-flags` is advisory: it
