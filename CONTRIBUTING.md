@@ -20,8 +20,10 @@ context. Review PRs here with that in mind, and expect the same of your own.
 - Every hook ships a `README.md` covering: what it does, which event and matcher, what it blocks or
   changes, how to test it, and how to disable it. A monitor's README covers what it watches, what it
   prints, how to test it, and how to turn it off.
-- Reference bundled scripts with **exec form**: put the interpreter in `command` and the script in
-  `args`, using `${CLAUDE_PLUGIN_ROOT}`. Never a relative path, never a path on your own machine.
+- Reference bundled scripts with `${CLAUDE_PLUGIN_ROOT}`. Never a relative path, never a path on
+  your own machine.
+
+  In a **hook**, use **exec form**: the interpreter in `command`, the script in `args`.
 
   ```json
   { "type": "command", "command": "python3",
@@ -31,6 +33,15 @@ context. Review PRs here with that in mind, and expect the same of your own.
   Exec form spawns the script directly instead of handing a string to `sh -c`, so quoting, spaces
   and `$` in a path stop being your problem. Shell form still works and is the right choice when you
   genuinely need a pipe or `&&`, but then every placeholder must be double-quoted.
+
+  A **monitor** has no exec form to choose: a `monitors.json` entry is `name`, `command`,
+  `description` and an optional `when`, and `command` is always a shell string. So double-quote
+  every placeholder, exactly as the entries here do.
+
+  ```json
+  { "name": "my-monitor", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/my-monitor.sh",
+    "description": "What is being watched" }
+  ```
 - Configuration that decides **what a hook is allowed to do** belongs in `userConfig` in
   `plugin.json`, not in a file inside the project. Claude Code prompts for those values when the
   plugin is enabled, stores them in user settings, and passes them to the hook as
