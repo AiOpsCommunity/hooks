@@ -259,6 +259,59 @@ def check_manifest(base, name):
     if version and not SEMVER.match(version):
         warn(f"{name}: version '{version}' is not semver")
 
+def check_bundled_skills(base, label):
+    """A hook may ship a skill that serves it; check it is well formed.
+
+    Skipping the directory entirely would let a broken SKILL.md ship unnoticed,
+    since Claude Code loads it from the same plugin as the hook.
+    """
+    skills_dir = os.path.join(base, "skills")
+    if not os.path.isdir(skills_dir):
+        return
+
+    names = sorted(
+        d for d in os.listdir(skills_dir)
+        if os.path.isdir(os.path.join(skills_dir, d))
+    )
+    if not names:
+        err(f"{label}: skills/ exists but holds no skill")
+        return
+
+    for skill in names:
+        path = os.path.join(skills_dir, skill, "SKILL.md")
+        if not os.path.isfile(path):
+            err(f"{label}: skills/{skill}/SKILL.md is missing")
+            continue
+
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+
+        if not text.startswith("---"):
+            err(f"{label}: skills/{skill}/SKILL.md has no YAML frontmatter")
+            continue
+
+        end = text.find("\n---", 3)
+        if end == -1:
+            err(f"{label}: skills/{skill}/SKILL.md frontmatter is not closed")
+            continue
+
+        front = text[3:end]
+        fields = dict(
+            re.match(r"^(\w+):\s*(.*)$", line).groups()
+            for line in front.splitlines()
+            if re.match(r"^(\w+):\s*(.*)$", line)
+        )
+
+        if fields.get("name") != skill:
+            err(
+                f"{label}: skills/{skill}/SKILL.md name "
+                f"'{fields.get('name')}' != folder '{skill}'"
+            )
+        elif not fields.get("description"):
+            err(f"{label}: skills/{skill}/SKILL.md has no description")
+        else:
+            ok(f"{label}: bundled skill {skill} is well formed")
+
 
 def load_json(path, label):
     try:
@@ -354,6 +407,8 @@ for kind, config_rel in KINDS:
         cfg = load_json(os.path.join(base, config_rel), name)
         if cfg is not None:
             check_config(base, kind, cfg, name)
+
+        check_bundled_skills(base, name)
 
 for orphan in sorted(set(listed) - all_on_disk):
     err(f"marketplace lists {orphan}, but no hooks/{orphan} or monitors/{orphan} exists")
