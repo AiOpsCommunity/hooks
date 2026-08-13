@@ -26,6 +26,11 @@
       "description": "PostToolUse hook that runs the formatter or linter a project already defines on the file just edited, returning failures so they are fixed in the same turn. Runs only inside directories you mark as trusted."
     },
     {
+      "name": "ci-watch",
+      "source": "./monitors/ci-watch",
+      "description": "Monitor that watches GitHub Actions for the branch you are on and reports a finished run, so a red build reaches the session without anyone going to look for it."
+    },
+    {
       "name": "log-watch",
       "source": "./monitors/log-watch",
       "description": "Monitor that watches the log files you name in your own config and reports only the lines matching your patterns, with rate limiting so a noisy log cannot flood the session."

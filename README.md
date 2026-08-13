@@ -31,6 +31,7 @@ agents, which only influence what Claude says, live in
 
 | Monitor | Watches | Description |
 | :--- | :---- | :---------- |
+| [`ci-watch`](monitors/ci-watch/) | GitHub Actions | Reports a finished workflow run for the current branch. Failures always; successes only when it saw the run start. |
 | [`log-watch`](monitors/log-watch/) | Log files | Reports only the lines matching patterns you configure, rate limited so a noisy log cannot flood the session. |
 
 ## Install

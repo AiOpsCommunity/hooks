@@ -1,0 +1,7 @@
+[
+  {
+    "name": "ci-watch",
+    "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/ci-watch.sh \"${CLAUDE_PLUGIN_DATA}\"",
+    "description": "GitHub Actions status for the current branch"
+  }
+]
