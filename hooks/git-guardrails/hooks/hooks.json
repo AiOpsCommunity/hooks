@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/git-guardrails.py",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/git-guardrails.py"],
             "if": "Bash(git *)",
             "timeout": 10
           }
