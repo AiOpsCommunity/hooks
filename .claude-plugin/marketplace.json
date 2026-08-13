@@ -9,6 +9,11 @@
       "name": "git-guardrails",
       "source": "./hooks/git-guardrails",
       "description": "PreToolUse hook that blocks irreversible git operations: force pushes to protected branches, hard resets over uncommitted work, protected branch deletion, untracked file wipes and history rewrites."
+    },
+    {
+      "name": "project-checks",
+      "source": "./hooks/project-checks",
+      "description": "PostToolUse hook that runs the formatter or linter a project already defines on the file just edited, returning failures so they are fixed in the same turn. Runs only inside directories you mark as trusted."
     }
   ]
 }

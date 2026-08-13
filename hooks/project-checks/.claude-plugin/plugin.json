@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "project-checks",
+  "description": "Runs the formatter or linter the project already defines on the file Claude just edited, and returns failures so they are fixed in the same turn. Runs only inside directories you have marked as trusted.",
+  "version": "2.0.0",
+  "author": { "name": "AiOps Community" },
+  "keywords": ["hook", "formatter", "linter", "post-tool-use"],
+  "license": "MIT",
+  "homepage": "https://github.com/AiOpsCommunity/hooks/tree/main/hooks/project-checks",
+  "repository": "https://github.com/AiOpsCommunity/hooks",
+  "defaultEnabled": false,
+  "userConfig": {
+    "trusted_roots": {
+      "type": "directory",
+      "title": "Trusted project directories",
+      "description": "Directories this hook may run in, for example your own projects folder. It stays silent everywhere else, so cloning an unfamiliar repository can never make it execute that repository's scripts. Anything you put inside a trusted directory is trusted.",
+      "multiple": true,
+      "required": true
+    }
+  }
+}
