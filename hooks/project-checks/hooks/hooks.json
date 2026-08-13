@@ -2,13 +2,13 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
             "command": "python3",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/my-new-hook.py"],
-            "timeout": 10
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/project-checks.py"],
+            "timeout": 90
           }
         ]
       }

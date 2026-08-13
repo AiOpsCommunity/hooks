@@ -32,11 +32,31 @@ import os
 import re
 import sys
 
-# Keep in sync with https://code.claude.com/docs/en/hooks — that page is the
-# source of truth. Add an event here only after checking it there.
+# Known events, from https://code.claude.com/docs/en/hooks. This list is a
+# convenience, not a gate: an event missing here is a warning, never a failure.
+# Claude Code ships new events regularly, and a validator that rejects a hook
+# because its own list is a release behind blocks work it has no business
+# blocking. A typo still gets noticed, which is the point.
 EVENTS = {
-    "PreToolUse", "PostToolUse", "UserPromptSubmit", "Notification",
-    "Stop", "SubagentStop", "SessionStart", "SessionEnd", "PreCompact",
+    # session
+    "SessionStart", "SessionEnd", "Setup",
+    # per turn
+    "UserPromptSubmit", "UserPromptExpansion", "Stop", "StopFailure",
+    # tools
+    "PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest",
+    "PermissionDenied", "PostToolBatch",
+    # notification and display
+    "Notification", "MessageDisplay",
+    # subagents and tasks
+    "SubagentStart", "SubagentStop", "TaskCreated", "TaskCompleted",
+    "TeammateIdle",
+    # configuration and files
+    "ConfigChange", "InstructionsLoaded", "CwdChanged", "DirectoryAdded",
+    "FileChanged",
+    # worktrees and compaction
+    "WorktreeCreate", "WorktreeRemove", "PreCompact", "PostCompact",
+    # MCP
+    "Elicitation", "ElicitationResult",
 }
 
 REQUIRED_MANIFEST_FIELDS = ("name", "description", "version")
@@ -62,24 +82,45 @@ def ok(msg):
     print(f"  ok: {msg}")
 
 
-def script_path_from(command):
-    """Extract the script path a hook command runs, relative to the plugin root.
+def script_path_from(hook):
+    """Extract the bundled script a hook runs, relative to the plugin root.
 
-    Commands look like: "${CLAUDE_PLUGIN_ROOT}"/scripts/name.py [args]
-    Returns None when there is nothing after the variable.
+    Two forms exist. Exec form puts the interpreter in `command` and the script
+    in `args`, and spawns it without a shell:
+
+        {"command": "python3", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/x.py"]}
+
+    Shell form puts everything in `command` and hands it to sh -c:
+
+        {"command": "\\"${CLAUDE_PLUGIN_ROOT}\\"/scripts/x.py"}
+
+    Returns None when no bundled script is referenced.
     """
-    tail = command.split("}", 1)[-1] if "}" in command else ""
-    tail = tail.strip().strip('"').strip()
-    if not tail:
-        return None
-    return tail.split()[0].lstrip("/")
+    parts = []
+    if isinstance(hook.get("args"), list):
+        parts = [a for a in hook["args"] if isinstance(a, str)]
+    if not parts:
+        parts = [hook.get("command", "")]
+
+    for part in parts:
+        if "CLAUDE_PLUGIN_ROOT" not in part:
+            continue
+        tail = part.split("}", 1)[-1]
+        tail = tail.strip().strip('"').strip()
+        if not tail:
+            continue
+        return tail.split()[0].lstrip("/")
+    return None
 
 
 def check_scripts(base, cfg, label):
     """Check every command in a hooks.json: variable use, path safety, script sanity."""
     for event, groups in (cfg.get("hooks") or {}).items():
         if event not in EVENTS:
-            err(f"{label}: unknown event '{event}'")
+            warn(
+                f"{label}: '{event}' is not in this script's list of known events. "
+                "If the docs list it, add it to EVENTS; if not, check the spelling"
+            )
         else:
             ok(f"{label}: event {event}")
 
@@ -93,15 +134,17 @@ def check_scripts(base, cfg, label):
                     continue
 
                 command = hook.get("command", "")
+                args = hook.get("args") if isinstance(hook.get("args"), list) else []
+                whole = " ".join([command] + [a for a in args if isinstance(a, str)])
 
-                if "CLAUDE_PLUGIN_ROOT" not in command:
-                    err(f"{label}: command does not use ${{CLAUDE_PLUGIN_ROOT}}: {command}")
-                if "/Users/" in command or "/home/" in command or "C:\\" in command:
-                    err(f"{label}: command contains a personal path: {command}")
+                if "CLAUDE_PLUGIN_ROOT" not in whole:
+                    err(f"{label}: nothing uses ${{CLAUDE_PLUGIN_ROOT}}: {whole}")
+                if "/Users/" in whole or "/home/" in whole or "C:\\" in whole:
+                    err(f"{label}: a personal path is hard-coded: {whole}")
                 if "timeout" not in hook:
                     warn(f"{label}: no timeout on the {event} command")
 
-                rel = script_path_from(command)
+                rel = script_path_from(hook)
                 if not rel:
                     continue
 
