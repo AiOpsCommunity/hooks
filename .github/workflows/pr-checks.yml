@@ -74,7 +74,8 @@ jobs:
           # manifest field still loads at runtime, which is exactly why it
           # should be caught here instead of by a user.
           status=0
-          for dir in hooks/*/; do
+          for dir in hooks/*/ monitors/*/; do
+            [ -d "$dir" ] || continue
             echo "== ${dir}"
             claude plugin validate "$dir" --strict || status=1
           done

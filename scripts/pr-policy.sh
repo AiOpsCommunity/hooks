@@ -4,7 +4,7 @@
 #
 #   - one hook per pull request
 #   - a new hook is registered in marketplace.json and listed in the README
-#   - the template is not silently modified alongside a hook
+#   - an existing template is not silently modified alongside a hook
 #
 # Usage: ./scripts/pr-policy.sh [base-ref]     (default: origin/main)
 #
@@ -65,34 +65,56 @@ def existed_at_base(path):
     return result.returncode == 0
 
 
+KINDS = ("hooks", "monitors")
+
+# (kind, name) pairs, so a hook and a monitor with the same name stay distinct.
 touched = []
 for path in changed:
     parts = path.split("/")
-    if len(parts) >= 2 and parts[0] == "hooks" and parts[1] not in touched:
-        touched.append(parts[1])
+    if len(parts) >= 2 and parts[0] in KINDS and (parts[0], parts[1]) not in touched:
+        touched.append((parts[0], parts[1]))
 
-hooks = [name for name in touched if not name.startswith("_")]
+templates = [(k, n) for k, n in touched if n.startswith("_")]
+components = [(k, n) for k, n in touched if not n.startswith("_")]
 
-if "_template" in touched and hooks:
+# Editing a template that people already build on is what deserves its own
+# review. A template that does not exist at the base is a new kind being
+# introduced, and reviewing that starting point without the first thing built
+# from it is guesswork, so the two belong together.
+edited_templates = [
+    (k, n) for k, n in templates
+    if existed_at_base(f"{k}/{n}/.claude-plugin/plugin.json")
+]
+new_templates = [t for t in templates if t not in edited_templates]
+
+if edited_templates and components:
     err(
-        "this PR changes both the template and a hook. Split them: a template "
-        "change affects everyone who starts a new hook and deserves its own review."
+        "this PR changes both an existing template and a component. Split them: a "
+        "template change affects everyone who starts a new one and deserves its "
+        "own review."
+    )
+elif new_templates and components:
+    ok(
+        "new template "
+        + ", ".join(sorted(f"{k}/{n}" for k, n in new_templates))
+        + " ships with its first component, which is how a new kind arrives"
     )
 
-if not hooks:
-    ok("no hook directories touched (infrastructure or docs change)")
-elif len(hooks) > 1:
+if not components:
+    ok("no hook or monitor directories touched (infrastructure or docs change)")
+elif len(components) > 1:
     err(
-        "one hook per pull request, this one touches "
-        + ", ".join(sorted(hooks))
-        + ". Split it: a reviewer reading shell that runs automatically should "
-        "have one thing in front of them."
+        "one hook or monitor per pull request, this one touches "
+        + ", ".join(sorted(f"{k}/{n}" for k, n in components))
+        + ". Split it: a reviewer reading something that runs automatically "
+        "should have one thing in front of them."
     )
 else:
-    name = hooks[0]
-    ok(f"exactly one hook touched: {name}")
+    kind, name = components[0]
+    singular = "hook" if kind == "hooks" else "monitor"
+    ok(f"exactly one {singular} touched: {name}")
 
-    is_new = not existed_at_base(f"hooks/{name}/.claude-plugin/plugin.json")
+    is_new = not existed_at_base(f"{kind}/{name}/.claude-plugin/plugin.json")
     if is_new:
         print(f"note: {name} is new, so it must be registered")
         if ".claude-plugin/marketplace.json" not in changed:
@@ -106,12 +128,12 @@ else:
         if "README.md" not in changed:
             err(
                 f"{name} is new but README.md is unchanged. Add a row to the "
-                "Hooks table so it is discoverable."
+                f"{kind.capitalize()} table so it is discoverable."
             )
         else:
             ok("README.md updated")
 
-        # The row has to actually mention the hook, not just be a whitespace edit.
+        # The row has to actually mention it, not just be a whitespace edit.
         if "README.md" in changed:
             with open("README.md") as fh:
                 if name not in fh.read():

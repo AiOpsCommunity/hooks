@@ -1,15 +1,16 @@
 # Contributing
 
-Each hook is a plugin folder under `hooks/`. See [README.md](README.md) for the layout and install
-instructions.
+Each hook is a plugin folder under `hooks/`, each monitor a plugin folder under `monitors/`. See
+[README.md](README.md) for the layout and install instructions.
 
-Hooks deserve more scrutiny than skills. A skill is text that Claude may or may not act on. A hook
-is shell that runs automatically, with your credentials, without confirmation, on every matching
-event. Review PRs here with that in mind, and expect the same of your own.
+Both deserve more scrutiny than skills. A skill is text that Claude may or may not act on. A hook is
+shell that runs automatically, with your credentials, without confirmation, on every matching event.
+A monitor is shell that runs for the entire session and feeds its output straight into Claude's
+context. Review PRs here with that in mind, and expect the same of your own.
 
 ## Rules
 
-- **One hook per pull request.**
+- **One hook or one monitor per pull request.**
 - Folder name is **kebab-case** and becomes the plugin name. Keep `name` in `plugin.json` equal to
   the folder name.
 - A hook may ship a **skill** alongside it, in `skills/<name>/SKILL.md`, when that skill exists to
@@ -17,7 +18,8 @@ event. Review PRs here with that in mind, and expect the same of your own.
   splitting them means installing two pieces that are useless apart. A skill that stands on its own
   belongs in [AiOpsCommunity/skills](https://github.com/AiOpsCommunity/skills) instead.
 - Every hook ships a `README.md` covering: what it does, which event and matcher, what it blocks or
-  changes, how to test it, and how to disable it.
+  changes, how to test it, and how to disable it. A monitor's README covers what it watches, what it
+  prints, how to test it, and how to turn it off.
 - Reference bundled scripts with **exec form**: put the interpreter in `command` and the script in
   `args`, using `${CLAUDE_PLUGIN_ROOT}`. Never a relative path, never a path on your own machine.
 
@@ -44,6 +46,21 @@ event. Review PRs here with that in mind, and expect the same of your own.
 - Prefer `python3` or POSIX shell over tools that may not be installed. If you need `jq`, say so in
   the README and fail with a clear message when it is missing.
 
+## Monitors specifically
+
+- **Print only what deserves to interrupt.** Every line a monitor writes to stdout reaches Claude as
+  a notification and costs context. Forwarding a whole log turns a session into noise, and noise is
+  how a useful monitor gets uninstalled. Filter in the script, before printing.
+- Stay alive and stay quiet. A monitor that exits early is a monitor that silently stopped watching;
+  block on `tail -f /dev/null` rather than returning when there is nothing to watch yet.
+- Do not poll faster than the thing you are watching changes. A monitor is a background process for
+  the whole session, so a tight loop is a tight loop for hours.
+- `${user_config.*}` is not substituted into a monitor command, and monitor processes do not receive
+  `CLAUDE_PLUGIN_OPTION_<KEY>`. If the monitor needs configuration, read it from a file the script
+  owns.
+- Remember that disabling the plugin mid-session does not stop a running monitor. It stops when the
+  session ends.
+
 ## Not accepted
 
 - Network calls that are not the entire point of the hook, and never without saying so in the README
@@ -57,9 +74,10 @@ event. Review PRs here with that in mind, and expect the same of your own.
 
 ```bash
 ./scripts/validate.sh                        # repo structure, registration, script permissions
-./scripts/pr-policy.sh                       # one hook per PR, and the hook is registered
+./scripts/pr-policy.sh                       # one component per PR, and it is registered
 ./scripts/review-flags.sh                    # lines a reviewer should read closely (never fails)
-claude plugin validate ./hooks/<name> --strict   # the official manifest schema check
+claude plugin validate ./hooks/<name> --strict       # the official manifest schema check
+claude plugin validate ./monitors/<name> --strict    # same, for a monitor
 ```
 
 The last one is Claude Code's own validator and catches things ours cannot: a misspelled manifest

@@ -1,12 +1,22 @@
-# AiOps Community hooks
+# AiOps Community hooks and monitors
 
-A collection of [Claude Code hooks](https://code.claude.com/docs/en/hooks), packaged as plugins so
-they can be installed with one command and updated later.
+Things that run automatically in your Claude Code session, packaged as plugins so they can be
+installed with one command and updated later.
 
-> **Hooks are Claude Code only.** Unlike skills, there is no `.hook` file and no upload in
-> claude.ai. A hook is shell configuration that Claude Code runs at a lifecycle event, so the only
-> shareable form is a plugin containing a `hooks/hooks.json`. That is what every entry in this repo
-> is.
+Two kinds live here, and they are mirror images of each other. A **hook** reacts to something Claude
+does: it fires on a lifecycle event and can block, format or record. A **monitor** reacts to
+something the world does: it runs in the background for the whole session and every line it prints
+reaches Claude as a notification, so Claude learns about a failing build or a log entry without
+anyone asking it to look.
+
+> **Claude Code only.** Unlike skills, there is no file to upload in claude.ai. Both are
+> configuration that Claude Code executes, so the only shareable form is a plugin containing a
+> `hooks/hooks.json` or a `monitors/monitors.json`. That is what every entry here is.
+
+They share a repository because they share a trust model: both run unsandboxed, automatically, with
+your credentials. That is what [CONTRIBUTING.md](CONTRIBUTING.md) is written around. Skills and
+agents, which only influence what Claude says, live in
+[AiOpsCommunity/skills](https://github.com/AiOpsCommunity/skills).
 
 ## Hooks
 
@@ -16,6 +26,12 @@ they can be installed with one command and updated later.
 | [`claude-md-maintainer`](hooks/claude-md-maintainer/) | `Stop` | Collects candidate CLAUDE.md lines into a local, git-excluded inbox; a bundled skill verifies them, prunes stale lines and enforces a size budget. |
 | [`git-guardrails`](hooks/git-guardrails/) | `PreToolUse` | Blocks irreversible git operations: force pushes to protected branches, hard resets over uncommitted work, protected branch deletion, untracked file wipes and history rewrites. |
 | [`project-checks`](hooks/project-checks/) | `PostToolUse` | Runs the formatter or linter a project already defines on the file just edited, returning failures so they are fixed in the same turn. Runs only in directories you mark as trusted. |
+
+## Monitors
+
+| Monitor | Watches | Description |
+| :--- | :---- | :---------- |
+| [`log-watch`](monitors/log-watch/) | Log files | Reports only the lines matching patterns you configure, rate limited so a noisy log cannot flood the session. |
 
 ## Install
 
@@ -50,24 +66,34 @@ real path.
 │   ├── validate.sh               # structure: JSON, events, paths, permissions
 │   ├── pr-policy.sh              # one hook per PR, registered properly
 │   └── review-flags.sh           # advisory: lines a reviewer should read
-└── hooks/
-    ├── _template/                # copy this to start a new hook
-    └── <hook-name>/
+├── hooks/
+│   ├── _template/                # copy this to start a new hook
+│   └── <hook-name>/
+│       ├── .claude-plugin/
+│       │   └── plugin.json       # manifest, metadata only
+│       ├── hooks/
+│       │   └── hooks.json        # the hook config (same shape as settings.json)
+│       ├── scripts/
+│       │   └── <script>          # what the hook actually runs
+│       ├── skills/               # optional, only when it serves the hook
+│       │   └── <name>/SKILL.md
+│       └── README.md             # what it does, why, how to test, how to disable
+└── monitors/
+    ├── _template/                # copy this to start a new monitor
+    └── <monitor-name>/
         ├── .claude-plugin/
-        │   └── plugin.json       # manifest, metadata only
-        ├── hooks/
-        │   └── hooks.json        # the hook config (same shape as settings.json)
+        │   └── plugin.json
+        ├── monitors/
+        │   └── monitors.json     # array of monitor entries
         ├── scripts/
-        │   └── <script>          # what the hook actually runs
-        ├── skills/               # optional, only when it serves the hook
-        │   └── <name>/SKILL.md
-        └── README.md             # what it does, why, how to test, how to disable
+        │   └── <script>          # the long-running command
+        └── README.md
 ```
 
-The nesting looks odd at first: `hooks/<hook-name>/hooks/hooks.json`. The outer `hooks/` is this
-repo's catalog directory. The inner one is required by Claude Code, which looks for `hooks/hooks.json`
-at the root of a plugin. Manifests live in `.claude-plugin/`, everything functional lives at the
-plugin root.
+The nesting looks odd at first: `hooks/<hook-name>/hooks/hooks.json`. The outer directory is this
+repo's catalog. The inner one is where Claude Code looks inside a plugin — `hooks/hooks.json` and
+`monitors/monitors.json` are both defaults it discovers on its own. Manifests live in
+`.claude-plugin/`, everything functional lives at the plugin root.
 
 ## Add a new hook
 
@@ -81,6 +107,23 @@ plugin root.
 3. Add a plugin entry to [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) and a
    row to the table above.
 4. Run `./scripts/validate.sh` and test locally (see CONTRIBUTING.md).
+
+## Add a new monitor
+
+Same shape, different directory and config file:
+
+```bash
+cp -r monitors/_template monitors/my-new-monitor
+```
+
+Fill in `.claude-plugin/plugin.json` and `monitors/monitors.json`, write the script, register it in
+`marketplace.json` and the Monitors table, and validate. The template README explains the contract:
+**stdout is a message to Claude**, so print only what deserves to interrupt.
+
+Monitors run only in interactive CLI sessions, run unsandboxed at the same trust level as hooks, and
+are an experimental component whose schema may still change. Note that `${user_config.*}` is not
+substituted into a monitor command and monitor processes do not receive `CLAUDE_PLUGIN_OPTION_<KEY>`,
+so a monitor that needs configuration reads it from a file the script owns.
 
 ## Events you can hook into
 

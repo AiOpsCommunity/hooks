@@ -1,0 +1,7 @@
+[
+  {
+    "name": "my-new-monitor",
+    "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/my-new-monitor.sh",
+    "description": "What is being watched, in a few words"
+  }
+]

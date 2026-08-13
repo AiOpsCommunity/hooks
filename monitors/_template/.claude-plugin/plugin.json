@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "my-new-monitor",
+  "description": "One sentence: what this watches and what Claude does with it.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Your Name"
+  },
+  "keywords": ["monitor"],
+  "license": "MIT",
+  "homepage": "https://github.com/AiOpsCommunity/hooks/tree/main/monitors/my-new-monitor",
+  "repository": "https://github.com/AiOpsCommunity/hooks"
+}
