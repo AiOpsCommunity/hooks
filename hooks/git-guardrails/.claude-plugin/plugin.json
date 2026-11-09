@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "git-guardrails",
   "description": "Blocks irreversible git operations: force pushes to protected branches, hard resets over uncommitted work, protected branch deletion and history rewrites.",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "author": {
     "name": "AiOps Community"
   },
@@ -14,5 +14,26 @@
   ],
   "license": "MIT",
   "homepage": "https://github.com/AiOpsCommunity/hooks/tree/main/hooks/git-guardrails",
-  "repository": "https://github.com/AiOpsCommunity/hooks"
+  "repository": "https://github.com/AiOpsCommunity/hooks",
+  "userConfig": {
+    "protected_branches": {
+      "type": "string",
+      "title": "Protected branches",
+      "description": "Branches the agent may not force push, delete or commit to directly. Glob patterns such as release/* work. A project can add branches to this list in .claude/git-guardrails.json, but never remove one.",
+      "multiple": true,
+      "default": ["main", "master", "production", "prod", "release/*"]
+    },
+    "allow_force_with_lease": {
+      "type": "boolean",
+      "title": "Allow a plain --force on feature branches",
+      "description": "When off, a force push to any branch must use --force-with-lease. Protected branches are blocked either way.",
+      "default": true
+    },
+    "block_commit_on_protected": {
+      "type": "boolean",
+      "title": "Block commits on protected branches",
+      "description": "Turn off for a solo repository where committing on main is the workflow.",
+      "default": true
+    }
+  }
 }
