@@ -46,7 +46,15 @@ Only segments whose program is actually `git` are inspected, so `echo "git push 
 
 ## Configure
 
-Optional, at `.claude/git-guardrails.json`:
+Claude Code asks for three settings when you enable the plugin, and stores them in your user settings:
+
+| Option | Default | What it decides |
+| :-- | :-- | :-- |
+| `protected_branches` | `main`, `master`, `production`, `prod`, `release/*` | Branches the agent may not force push, delete or commit to directly |
+| `allow_force_with_lease` | on | When off, a force push to any branch must use `--force-with-lease` |
+| `block_commit_on_protected` | on | Turn off for a solo repository where committing on main is the workflow |
+
+Installed by hand, without the plugin, the same settings go in `~/.claude/git-guardrails.json`:
 
 ```json
 {
@@ -56,7 +64,7 @@ Optional, at `.claude/git-guardrails.json`:
 }
 ```
 
-Set `blockCommitOnProtected` to false for a solo repo where committing on main is the workflow.
+A `.claude/git-guardrails.json` inside a project can only make the hook stricter. Its `protectedBranches` are added to yours, `"allowForceWithLease": false` and `"blockCommitOnProtected": true` switch a check on, and anything that would loosen a check is ignored. These settings decide what the hook lets through, and a file in the project can come from any repository you clone, so it cannot be the place that switches protection off. CONTRIBUTING.md has the same rule for every hook here.
 
 ## Test it
 
@@ -67,4 +75,4 @@ echo '{"cwd":"'"$PWD"'","tool_input":{"command":"git push origin feature/x"}}' |
 
 ## Disable
 
-`/plugin uninstall git-guardrails@aiops-hooks`, or set the branch list to `[]` for a project.
+`/plugin uninstall git-guardrails@aiops-hooks`, or `claude plugin disable git-guardrails@aiops-hooks --scope local` for one project.

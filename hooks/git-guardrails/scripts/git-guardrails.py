@@ -11,13 +11,23 @@ within a day, so the bar for blocking is "this loses work permanently".
 Exits 2 with the reason on stderr when it blocks, which is what sends the reason
 back to Claude. Fails open on anything unexpected.
 
-Config, optional, at .claude/git-guardrails.json in the project:
+Settings come from user scope only, because they decide what the hook lets
+through, and a file in the project can be supplied by any repository you clone:
+
+  1. The plugin's userConfig options, which Claude Code passes as
+     CLAUDE_PLUGIN_OPTION_PROTECTED_BRANCHES, _ALLOW_FORCE_WITH_LEASE and
+     _BLOCK_COMMIT_ON_PROTECTED.
+  2. Without those, for a hand install, ~/.claude/git-guardrails.json:
 
     {
       "protectedBranches": ["main", "master", "production", "release/*"],
       "allowForceWithLease": true,
       "blockCommitOnProtected": true
     }
+
+A .claude/git-guardrails.json in the project is still read, but can only make
+the hook stricter: its branches are added to the protected ones, and it can
+switch a check on but never off.
 """
 
 import fnmatch
@@ -95,14 +105,77 @@ def git_commands(command):
     return out
 
 
-def load_config(cwd):
-    cfg = dict(DEFAULTS)
-    path = os.path.join(cwd, ".claude", "git-guardrails.json")
+def read_json(path):
     try:
         with open(path) as fh:
-            cfg.update(json.load(fh))
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
-        pass
+        return {}
+
+
+def as_list(value):
+    """A branch list from userConfig or JSON.
+
+    The multi-value environment format is not documented precisely, so a JSON
+    array and a comma- or newline-separated string are both accepted.
+    """
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            value = re.split(r"[,\n]", value)
+    if not isinstance(value, list):
+        value = [value]
+    return [str(v).strip() for v in value if str(v).strip()]
+
+
+def as_bool(value, default):
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in ("true", "1", "yes"):
+        return True
+    if text in ("false", "0", "no"):
+        return False
+    return default
+
+
+def user_settings():
+    options = {
+        "protectedBranches": "PROTECTED_BRANCHES",
+        "allowForceWithLease": "ALLOW_FORCE_WITH_LEASE",
+        "blockCommitOnProtected": "BLOCK_COMMIT_ON_PROTECTED",
+    }
+    from_env = {
+        key: os.environ[f"CLAUDE_PLUGIN_OPTION_{name}"]
+        for key, name in options.items()
+        if f"CLAUDE_PLUGIN_OPTION_{name}" in os.environ
+    }
+    if from_env:
+        return from_env
+    return read_json(os.path.expanduser("~/.claude/git-guardrails.json"))
+
+
+def load_config(cwd):
+    cfg = dict(DEFAULTS)
+    user = user_settings()
+    if "protectedBranches" in user:
+        cfg["protectedBranches"] = as_list(user["protectedBranches"])
+    for key in ("allowForceWithLease", "blockCommitOnProtected"):
+        if key in user:
+            cfg[key] = as_bool(user[key], cfg[key])
+
+    project = read_json(os.path.join(cwd, ".claude", "git-guardrails.json"))
+    if "protectedBranches" in project:
+        extra = as_list(project["protectedBranches"])
+        cfg["protectedBranches"] = cfg["protectedBranches"] + [
+            b for b in extra if b not in cfg["protectedBranches"]
+        ]
+    if project.get("allowForceWithLease") is False:
+        cfg["allowForceWithLease"] = False
+    if project.get("blockCommitOnProtected") is True:
+        cfg["blockCommitOnProtected"] = True
     return cfg
 
 
