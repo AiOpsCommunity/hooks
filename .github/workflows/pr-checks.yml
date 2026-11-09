@@ -87,6 +87,15 @@ jobs:
           # plugins, which is the correct state for main until a hook merges.
           claude plugin validate .
 
+  behaviour:
+    name: behaviour
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: selftest.sh
+        run: ./scripts/selftest.sh
+
   pr-policy:
     name: pr-policy
     if: github.event_name == 'pull_request'

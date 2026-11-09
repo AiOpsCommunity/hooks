@@ -20,6 +20,11 @@ context. Review PRs here with that in mind, and expect the same of your own.
 - Every hook ships a `README.md` covering: what it does, which event and matcher, what it blocks or
   changes, how to test it, and how to disable it. A monitor's README covers what it watches, what it
   prints, how to test it, and how to turn it off.
+- A hook that **blocks or changes** something ships a `--selftest`: run with that one argument, the
+  script checks a table of recorded inputs against the decision each should get, prints what
+  failed, and exits non-zero on a failure. Put each case it must leave alone next to the case it
+  blocks, since a false positive is what gets a guardrail uninstalled. When a bug report comes in,
+  the fix adds its row. `block-secret-files` shows the shape.
 - Reference bundled scripts with `${CLAUDE_PLUGIN_ROOT}`. Never a relative path, never a path on
   your own machine.
 
@@ -87,6 +92,7 @@ context. Review PRs here with that in mind, and expect the same of your own.
 ./scripts/validate.sh                        # repo structure, registration, script permissions
 ./scripts/pr-policy.sh                       # one component per PR, and it is registered
 ./scripts/review-flags.sh                    # lines a reviewer should read closely (never fails)
+./scripts/selftest.sh                        # every script's recorded cases still get their decision
 claude plugin validate ./hooks/<name> --strict       # the official manifest schema check
 claude plugin validate ./monitors/<name> --strict    # same, for a monitor
 ```
@@ -95,8 +101,8 @@ The last one is Claude Code's own validator and catches things ours cannot: a mi
 field, a value of the wrong type, a field left over from another tool's manifest. `--strict` makes
 warnings fail, which is what you want before publishing.
 
-CI runs the same three scripts on every pull request, so a green run here is a green run there.
-`structure`, `lint` and `pr-policy` must pass before a PR can merge. `review-flags` is advisory: it
+CI runs the same four scripts on every pull request, so a green run here is a green run there.
+`structure`, `lint`, `pr-policy` and `behaviour` must pass before a PR can merge. `review-flags` is advisory: it
 prints a table of lines worth a second look and always passes, because every pattern it knows has
 legitimate uses. If it flags your hook, explain why in the PR rather than leaving the reviewer to
 work it out.
