@@ -5,6 +5,7 @@
 #   - one hook per pull request
 #   - a new hook is registered in marketplace.json and listed in the README
 #   - an existing template is not silently modified alongside a hook
+#   - an edited hook or monitor raises its version, or installs never see it
 #
 # Usage: ./scripts/pr-policy.sh [base-ref]     (default: origin/main)
 #
@@ -37,11 +38,13 @@ done <<< "$changed"
 echo
 
 CHANGED="$changed" BASE="$merge_base" python3 - <<'PY'
+import json
 import os
+import re
 import subprocess
 import sys
 
-changed = [line for line in os.environ["CHANGED"].splitlines() if line.strip()]
+changed =[line for line in os.environ["CHANGED"].splitlines() if line.strip()]
 base = os.environ["BASE"]
 
 fail = False
@@ -63,6 +66,23 @@ def existed_at_base(path):
         capture_output=True,
     )
     return result.returncode == 0
+
+
+def version_at(ref, path):
+    result = subprocess.run(
+        ["git", "show", f"{ref}:{path}"], capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        return str(json.loads(result.stdout).get("version", ""))
+    except ValueError:
+        return None
+
+
+def semver(version):
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)", version or "")
+    return tuple(int(part) for part in match.groups()) if match else None
 
 
 KINDS = ("hooks", "monitors")
@@ -142,6 +162,31 @@ else:
                     ok(f"README.md mentions {name}")
     else:
         ok(f"{name} already existed, treating this as an edit")
+
+        # Claude Code keys an installed plugin on its version: with the same
+        # version, `claude plugin update` reports it is already up to date and
+        # keeps the old copy. A README is not loaded, so it needs no bump.
+        prefix = f"{kind}/{name}/"
+        shipped = [
+            p for p in changed
+            if p.startswith(prefix) and p != f"{prefix}README.md"
+        ]
+        manifest = f"{prefix}.claude-plugin/plugin.json"
+        before = version_at(base, manifest)
+        after = version_at("HEAD", manifest)
+        if not shipped:
+            ok(f"only the README of {name} changed, no version bump needed")
+        elif semver(after) is None or semver(before) is None:
+            err(f"{manifest}: cannot compare version '{before}' with '{after}'")
+        elif semver(after) <= semver(before):
+            err(
+                f"{name} changed but its version is still {after}. Raise it in "
+                f"{manifest}: Claude Code only updates an installed plugin when "
+                "its version changes, so without a bump nobody who installed "
+                f"{name} gets this change."
+            )
+        else:
+            ok(f"{name} version raised from {before} to {after}")
 
 sys.exit(1 if fail else 0)
 PY
