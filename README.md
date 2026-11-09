@@ -66,7 +66,8 @@ real path.
 ├── scripts/
 │   ├── validate.sh               # structure: JSON, events, paths, permissions
 │   ├── pr-policy.sh              # one hook per PR, registered properly
-│   └── review-flags.sh           # advisory: lines a reviewer should read
+│   ├── review-flags.sh           # advisory: lines a reviewer should read
+│   └── selftest.sh               # behaviour: each script's recorded cases
 ├── hooks/
 │   ├── _template/                # copy this to start a new hook
 │   └── <hook-name>/

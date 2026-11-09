@@ -8,6 +8,8 @@ on. Nothing else is ever printed to stdout, because extra output breaks parsing.
 
 Fails open: if the payload is unreadable or the tool has no path, the call is
 allowed. A guardrail that crashes should not take the session down with it.
+
+Run with --selftest to check every recorded path against what it should get.
 """
 
 import fnmatch
@@ -105,22 +107,79 @@ def is_secret(path):
     return None
 
 
-def main():
-    try:
-        payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        allow()
-
-    tool_input = payload.get("tool_input") or {}
+def find_secret(tool_input):
+    """The first (path, reason) in the tool input that is a secret, or None."""
     if not isinstance(tool_input, dict):
-        allow()
-
+        return None
     for key in PATH_KEYS:
         path = tool_input.get(key)
         if isinstance(path, str) and path:
             reason = is_secret(path)
             if reason:
-                deny(path, reason)
+                return path, reason
+    return None
+
+
+# (tool input, expected). Each row that is allowed sits next to the secret it
+# could be mistaken for.
+SELFTEST = [
+    ({"file_path": ".env"}, "deny"),
+    ({"file_path": "/repo/.env"}, "deny"),
+    ({"file_path": "/repo/.env.local"}, "deny"),
+    ({"file_path": "/repo/config/.env.production"}, "deny"),
+    ({"file_path": "/repo/certs/server.pem"}, "deny"),
+    ({"file_path": "/repo/tls.key"}, "deny"),
+    ({"file_path": "/home/me/.ssh/id_ed25519"}, "deny"),
+    ({"file_path": "/home/me/.ssh/config"}, "deny"),
+    ({"file_path": "/home/me/.aws/credentials"}, "deny"),
+    ({"file_path": "/home/me/.kube/config"}, "deny"),
+    ({"file_path": "/home/me/.docker/config.json"}, "deny"),
+    ({"file_path": "/repo/service-account-prod.json"}, "deny"),
+    ({"file_path": "/home/me/.npmrc"}, "deny"),
+    ({"file_path": "/home/me/vault.kdbx"}, "deny"),
+    ({"file_path": "C:\\Users\\me\\.ssh\\id_rsa"}, "deny"),
+    ({"notebook_path": "/repo/.env"}, "deny"),
+    ({"path": "/home/me/.gnupg/pubring.kbx"}, "deny"),
+    ({"file_path": "/repo/README.md", "path": "/repo/.env"}, "deny"),
+    ({"file_path": "/repo/.env.example"}, "allow"),
+    ({"file_path": "/repo/.env.template"}, "allow"),
+    ({"file_path": "/repo/.env.dist"}, "allow"),
+    ({"file_path": "/repo/settings.example.json"}, "allow"),
+    ({"file_path": "/repo/src/env.ts"}, "allow"),
+    ({"file_path": "/repo/src/environment.py"}, "allow"),
+    ({"file_path": "/repo/docs/credentials.md"}, "allow"),
+    ({"file_path": "/repo/src/keys.py"}, "allow"),
+    ({"file_path": "/repo/monkey.ts"}, "allow"),
+    ({"file_path": "/repo/.ssh-notes.md"}, "allow"),
+    ({"file_path": ""}, "allow"),
+    ({}, "allow"),
+    ("not a dict", "allow"),
+]
+
+
+def selftest():
+    failures = 0
+    for tool_input, expected in SELFTEST:
+        got = "deny" if find_secret(tool_input) else "allow"
+        if got != expected:
+            failures += 1
+            print(f"FAIL {tool_input!r}: expected {expected}, got {got}")
+    print(f"{len(SELFTEST) - failures}/{len(SELFTEST)} cases pass")
+    return 1 if failures else 0
+
+
+def main():
+    if sys.argv[1:] == ["--selftest"]:
+        sys.exit(selftest())
+
+    try:
+        payload = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        allow()
+
+    found = find_secret(payload.get("tool_input") or {})
+    if found:
+        deny(*found)
 
     allow()
 

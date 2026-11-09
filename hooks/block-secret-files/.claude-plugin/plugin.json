@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "block-secret-files",
   "description": "Blocks reads and writes of secret files (.env, private keys, credential stores) before the tool runs.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": {
     "name": "AiOps Community"
   },

@@ -62,7 +62,16 @@ add this to `~/.claude/settings.json` with the real path:
 
 ## Test it
 
-Directly, without Claude Code:
+The recorded cases, each secret next to a path it must leave alone:
+
+```bash
+./scripts/block-secret-files.py --selftest
+```
+
+A change to the patterns adds rows to `SELFTEST` in the script. CI runs it through
+`scripts/selftest.sh`.
+
+One path by hand, without Claude Code:
 
 ```bash
 echo '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/app/.env"}}' \
