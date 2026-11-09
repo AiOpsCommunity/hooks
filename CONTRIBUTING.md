@@ -11,6 +11,11 @@ context. Review PRs here with that in mind, and expect the same of your own.
 ## Rules
 
 - **One hook or one monitor per pull request.**
+- **Raise the version when you change one.** Claude Code only updates an installed plugin when the
+  `version` in its `plugin.json` changes; with the same version, `claude plugin update` reports it
+  is already up to date and keeps the old copy. Patch for a fix, minor for something it newly
+  blocks or does, major when existing setups need a change. A change to its `README.md` alone needs
+  no bump. `pr-policy.sh` checks this.
 - Folder name is **kebab-case** and becomes the plugin name. Keep `name` in `plugin.json` equal to
   the folder name.
 - A hook may ship a **skill** alongside it, in `skills/<name>/SKILL.md`, when that skill exists to
